@@ -15,6 +15,7 @@ Namespace Controllers
         Public Sub New()
             _db = New AppDbContext()
             _listService = New ListService(_db)
+
         End Sub
 
         ' GET: /ListBuilder/

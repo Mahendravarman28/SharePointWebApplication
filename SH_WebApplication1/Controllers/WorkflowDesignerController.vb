@@ -13,6 +13,7 @@ Namespace Controllers
         Private ReadOnly _wfService As IWorkflowService
         Private ReadOnly _listService As IListService
         Private ReadOnly _itemService As IItemService
+        Private ReadOnly _securityService As ISecurityService
         Private ReadOnly _db As AppDbContext
 
         Public Sub New()
@@ -20,6 +21,7 @@ Namespace Controllers
             _wfService = New WorkflowService(_db)
             _listService = New ListService(_db)
             _itemService = New ItemService(_db)
+            _securityService = New SecurityService(_db)
         End Sub
 
         ' GET: /WorkflowDesigner/Index/5
@@ -45,6 +47,7 @@ Namespace Controllers
                 }
             End If
             ViewBag.List = list
+            ViewBag.Roles = _securityService.GetRoles()
             Return View(wf)
         End Function
 
@@ -86,8 +89,12 @@ Namespace Controllers
             Dim item = _itemService.GetItemById(itemId)
             If item Is Nothing Then Return HttpNotFound()
             Dim list = _listService.GetListById(item.ListId)
+            Dim wf = _wfService.GetPublishedWorkflow(item.ListId)
             ViewBag.List = list
             ViewBag.Item = item
+            ViewBag.Workflow = wf
+            ViewBag.AllStates = If(wf IsNot Nothing, _wfService.GetStates(wf.WorkflowId), New List(Of AppWorkflowState)())
+            ViewBag.CurrentState = _wfService.GetCurrentState(itemId)
             ViewBag.Transitions = _wfService.GetAvailableTransitions(itemId, User.Identity.Name)
             ViewBag.History = _wfService.GetWorkflowHistory(itemId)
             Return View()
@@ -116,6 +123,7 @@ Namespace Controllers
             If String.IsNullOrEmpty(wf.WorkflowJson) Then Return
             Try
                 Dim obj = JsonConvert.DeserializeObject(Of Dictionary(Of String, Object))(wf.WorkflowJson)
+
                 ' States
                 If obj.ContainsKey("states") Then
                     Dim statesToken = obj("states")
@@ -131,6 +139,40 @@ Namespace Controllers
                                 .IsStart = s.ContainsKey("isStart") AndAlso CBool(s("isStart")),
                                 .IsEnd = s.ContainsKey("isEnd") AndAlso CBool(s("isEnd")),
                                 .ColorCode = If(s.ContainsKey("color"), s("color").ToString(), "")
+                            })
+                        End If
+                    Next
+                    _db.SaveChanges()
+                End If
+
+                ' Transitions
+                If obj.ContainsKey("transitions") Then
+                    Dim transToken = obj("transitions")
+                    Dim transitions = JsonConvert.DeserializeObject(Of List(Of Dictionary(Of String, Object)))(transToken.ToString())
+
+                    ' Remove old transitions for this workflow
+                    Dim oldTransitions = _db.AppWorkflowTransitions.Where(Function(t) t.WorkflowId = wf.WorkflowId).ToList()
+                    For Each oldT In oldTransitions
+                        _db.AppWorkflowTransitions.Remove(oldT)
+                    Next
+                    _db.SaveChanges()
+
+                    ' Add new transitions from JSON
+                    For Each t In transitions
+                        Dim fromCode = t("fromCode").ToString()
+                        Dim toCode = t("toCode").ToString()
+                        Dim fromState = _db.AppWorkflowStates.FirstOrDefault(Function(s) s.WorkflowId = wf.WorkflowId AndAlso s.StateCode = fromCode)
+                        Dim toState = _db.AppWorkflowStates.FirstOrDefault(Function(s) s.WorkflowId = wf.WorkflowId AndAlso s.StateCode = toCode)
+
+                        If fromState IsNot Nothing AndAlso toState IsNot Nothing Then
+                            _db.AppWorkflowTransitions.Add(New AppWorkflowTransition With {
+                                .WorkflowId = wf.WorkflowId,
+                                .FromStateId = fromState.StateId,
+                                .ToStateId = toState.StateId,
+                                .ActionName = t("actionName").ToString(),
+                                .ActionCode = If(t.ContainsKey("actionCode"), t("actionCode").ToString(), ""),
+                                .RoleRequired = If(t.ContainsKey("role"), t("role").ToString(), ""),
+                                .ConditionExpression = If(t.ContainsKey("condition"), t("condition").ToString(), "")
                             })
                         End If
                     Next

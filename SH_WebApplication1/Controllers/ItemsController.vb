@@ -47,16 +47,8 @@ Namespace Controllers
                 End If
             Next
             Dim item = _itemService.CreateItem(listId, values, User.Identity.Name)
-            ' start workflow if published
-            Dim wf = _wfService.GetPublishedWorkflow(listId)
-            If wf IsNot Nothing Then
-                Dim startState = _db.AppWorkflowStates.FirstOrDefault(Function(s) s.WorkflowId = wf.WorkflowId AndAlso s.IsStart)
-                If startState IsNot Nothing Then
-                    item.CurrentStateId = startState.StateId
-                    item.CurrentStatus = startState.StateName
-                    _db.SaveChanges()
-                End If
-            End If
+            ' Initiate workflow if a published workflow exists for this list
+            _wfService.InitiateWorkflow(item.ItemId, listId, User.Identity.Name)
             Return RedirectToAction("Display", New With {.id = item.ItemId})
         End Function
 
@@ -106,6 +98,86 @@ Namespace Controllers
         Public Function Delete(id As Integer, listId As Integer) As ActionResult
             _itemService.DeleteItem(id)
             Return RedirectToAction("Render", "ViewDesigner", New With {.listId = listId})
+        End Function
+
+        ' POST: /Items/UploadAttachment
+        <HttpPost, ValidateAntiForgeryToken>
+        Public Function UploadAttachment(itemId As Integer) As ActionResult
+            Try
+                Dim file = Request.Files(0)
+                If file IsNot Nothing AndAlso file.ContentLength > 0 Then
+                    Dim item = _itemService.GetItemById(itemId)
+                    If item Is Nothing Then Return HttpNotFound()
+                    ' Create folder ~/App_Data/Attachments/{itemId}/
+                    Dim folder = Server.MapPath($"~/App_Data/Attachments/{itemId}")
+                    If Not IO.Directory.Exists(folder) Then IO.Directory.CreateDirectory(folder)
+                    Dim fileName = IO.Path.GetFileName(file.FileName)
+                    Dim filePath = IO.Path.Combine(folder, fileName)
+                    file.SaveAs(filePath)
+                    ' Save attachment record
+                    Dim att As New AppAttachment With {
+                        .ItemId = itemId,
+                        .FileName = fileName,
+                        .ContentType = file.ContentType,
+                        .FileSizeBytes = file.ContentLength,
+                        .FilePath = filePath,
+                        .UploadedBy = User.Identity.Name,
+                        .UploadedDate = DateTime.Now
+                    }
+                    _db.AppAttachments.Add(att)
+                    _db.SaveChanges()
+                    TempData("Success") = "File uploaded successfully."
+                End If
+            Catch ex As Exception
+                TempData("Error") = $"Upload failed: {ex.Message}"
+            End Try
+            Return RedirectToAction("Display", New With {.id = itemId})
+        End Function
+
+        ' GET: /Items/DownloadAttachment/5
+        Public Function DownloadAttachment(id As Integer) As ActionResult
+            Dim att = _db.AppAttachments.Find(id)
+            If att Is Nothing OrElse Not IO.File.Exists(att.FilePath) Then Return HttpNotFound()
+            Return File(att.FilePath, att.ContentType, att.FileName)
+        End Function
+
+        ' GET: /Items/ViewAttachment/5
+        Public Function ViewAttachment(id As Integer) As ActionResult
+            Dim att = _db.AppAttachments.Find(id)
+            If att Is Nothing OrElse Not IO.File.Exists(att.FilePath) Then Return HttpNotFound()
+
+            ' Determine if file can be viewed inline based on extension
+            Dim ext = IO.Path.GetExtension(att.FileName).ToLower()
+            Dim canViewInline = {".pdf", ".txt", ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg"}.Contains(ext)
+
+            ' Set content disposition to inline for viewable types
+            If canViewInline Then
+                Response.AddHeader("Content-Disposition", $"inline; filename=""{att.FileName}""")
+                Return File(att.FilePath, att.ContentType)
+            Else
+                ' For Office documents and others, return file info for external viewer
+                ViewBag.Attachment = att
+                ViewBag.CanViewInBrowser = {".pdf"}.Contains(ext)
+                ViewBag.IsOfficeDoc = {".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"}.Contains(ext)
+                Return View(att)
+            End If
+        End Function
+
+        ' POST: /Items/DeleteAttachment/5
+        <HttpPost, ValidateAntiForgeryToken>
+        Public Function DeleteAttachment(id As Integer, itemId As Integer) As ActionResult
+            Try
+                Dim att = _db.AppAttachments.Find(id)
+                If att IsNot Nothing Then
+                    If IO.File.Exists(att.FilePath) Then IO.File.Delete(att.FilePath)
+                    _db.AppAttachments.Remove(att)
+                    _db.SaveChanges()
+                    TempData("Success") = "Attachment deleted."
+                End If
+            Catch ex As Exception
+                TempData("Error") = $"Delete failed: {ex.Message}"
+            End Try
+            Return RedirectToAction("Display", New With {.id = itemId})
         End Function
 
         Protected Overrides Sub Dispose(disposing As Boolean)

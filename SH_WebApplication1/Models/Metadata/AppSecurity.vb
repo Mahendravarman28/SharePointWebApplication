@@ -78,4 +78,29 @@ Namespace Models.Metadata
 
     End Class
 
+
+    ''' <summary>Field-level security: restrict field visibility by role</summary>
+    <Table("AppFieldPermissions")>
+    Public Class AppFieldPermission
+
+        <Key>
+        Public Property FieldPermissionId As Integer
+
+        Public Property FieldId As Integer
+        Public Property RoleId As Integer
+
+        ''' <summary>Can view this field</summary>
+        Public Property CanView As Boolean = True
+
+        ''' <summary>Can edit this field</summary>
+        Public Property CanEdit As Boolean = False
+
+        <ForeignKey("FieldId")>
+        Public Overridable Property Field As AppListField
+
+        <ForeignKey("RoleId")>
+        Public Overridable Property Role As AppRole
+
+    End Class
+
 End Namespace

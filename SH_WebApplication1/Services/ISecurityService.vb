@@ -14,6 +14,7 @@ Namespace Services
         Function AssignUserRole(userId As String, roleId As Integer, listId As Integer?) As Boolean
         Function GetUserRoles(userId As String) As List(Of AppRole)
         Function UserHasPermission(userId As String, permissionCode As String, listId As Integer?) As Boolean
+        Function GetVisibleFields(listId As Integer, userId As String) As List(Of AppListField)
     End Interface
 
 End Namespace

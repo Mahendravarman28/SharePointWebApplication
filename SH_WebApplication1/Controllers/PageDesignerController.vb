@@ -86,6 +86,13 @@ Namespace Controllers
             ViewBag.TotalItems = _itemService.CountItems(listId)
             ViewBag.RecentItems = _itemService.GetItems(listId, 0, 5)
             ViewBag.Fields = _listService.GetFields(listId).Where(Function(f) f.IsVisibleInList).Take(4).ToList()
+            ' Status distribution for Chart.js
+            Dim allItems = _itemService.GetItems(listId, 0, 9999)
+            Dim statusGroups = allItems.GroupBy(Function(i) If(String.IsNullOrEmpty(i.CurrentStatus), "No Status", i.CurrentStatus)) _
+                                       .Select(Function(g) New statusGroupsModel With {.Status = g.Key, .Count = g.Count()}) _
+                                       .ToList()
+            If statusGroups.Count = 0 Then statusGroups = New List(Of statusGroupsModel) From {New statusGroupsModel With {.Status = "", .Count = 0}}
+            ViewBag.StatusDistribution = statusGroups
             Return View(page)
         End Function
 

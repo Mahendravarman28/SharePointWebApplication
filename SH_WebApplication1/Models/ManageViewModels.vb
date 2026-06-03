@@ -2,6 +2,12 @@
 Imports Microsoft.AspNet.Identity
 Imports Microsoft.Owin.Security
 
+Public Class statusGroupsModel
+
+    Public Property Status As String
+    Public Property Count As Integer
+
+End Class
 Public Class IndexViewModel
     Public Property HasPassword As Boolean
     Public Property Logins As IList(Of UserLoginInfo)

@@ -2,6 +2,7 @@
 @Code
     ViewData("Title") = "Workflow Designer"
     Dim list As SH_WebApplication1.Models.Metadata.AppList = ViewBag.List
+    Dim roles As List(Of SH_WebApplication1.Models.Metadata.AppRole) = ViewBag.Roles
 End Code
 
 <div class="container-fluid mt-3">
@@ -42,10 +43,15 @@ End Code
             <hr>
             <h6 class="fw-bold text-uppercase text-muted small mb-2">Add Transition</h6>
             <div>
-                <select id="tranFrom" class="form-select form-select-sm mb-1" id="tranFrom"></select>
-                <select id="tranTo" class="form-select form-select-sm mb-1" id="tranTo"></select>
+                <select id="tranFrom" class="form-select form-select-sm mb-1"></select>
+                <select id="tranTo" class="form-select form-select-sm mb-1"></select>
                 <input type="text" id="tranAction" class="form-control form-control-sm mb-1" placeholder="Action name (e.g. Approve)">
-                <input type="text" id="tranRole" class="form-control form-control-sm mb-1" placeholder="Required role">
+                <select id="tranRole" class="form-select form-select-sm mb-1">
+                    <option value="">— No role required —</option>
+                    @For Each role In roles
+                        @<option value="@role.RoleName">@role.RoleName</option>
+                    Next
+                </select>
                 <button class="btn btn-sm btn-outline-primary w-100" id="btnAddTransition"><i class="bi bi-arrow-right-circle"></i> Add Transition</button>
             </div>
         </div>
@@ -138,10 +144,12 @@ End Code
 
         $('#btnAddTransition').click(function () {
             var from = $('#tranFrom').val(); var to = $('#tranTo').val(); var action = $('#tranAction').val().trim();
+            var role = $('#tranRole').val();
             if (!from || !to || !action) { alert('Please fill From, To and Action.'); return; }
             if (from === to) { alert('From and To states cannot be the same.'); return; }
-            wfData.transitions.push({ fromCode: from, toCode: to, actionName: action, role: $('#tranRole').val().trim(), condition: '' });
-            $('#tranAction,#tranRole').val('');
+            wfData.transitions.push({ fromCode: from, toCode: to, actionName: action, role: role, condition: '' });
+            $('#tranAction').val('');
+            $('#tranRole').val('');
             renderTransitions();
         });
 

@@ -12,26 +12,29 @@ End Code
         @Html.Hidden("listId", list.ListId)
         @<div class="card shadow-sm">
             <div class="card-body">
-                <div class="row">
+                <div class="row" id="formFields">
                     @For Each f In fields
                         Dim req = If(f.IsRequired, "required", "")
                         Dim reqStar = If(f.IsRequired, " <span class='text-danger'>*</span>", "")
                         Dim ctrl As String
+                        Dim fieldId = $"field_{f.FieldId}"
                         Select Case f.DataType.ToLower()
                             Case "multiline"
-                                ctrl = $"<textarea class='form-control' name='field_{f.FieldId}' rows='3' {req}></textarea>"
+                                ctrl = $"<textarea class='form-control' id='{fieldId}' name='{fieldId}' rows='3' {req}></textarea>"
                             Case "yesno"
-                                ctrl = $"<div class='form-check'><input class='form-check-input' type='checkbox' name='field_{f.FieldId}' value='true'><label class='form-check-label'>Yes</label></div>"
+                                ctrl = $"<div class='form-check'><input class='form-check-input' id='{fieldId}' type='checkbox' name='{fieldId}' value='true'><label class='form-check-label'>Yes</label></div>"
                             Case "datetime"
-                                ctrl = $"<input type='datetime-local' class='form-control' name='field_{f.FieldId}' {req}>"
+                                ctrl = $"<input type='datetime-local' class='form-control' id='{fieldId}' name='{fieldId}' {req}>"
                             Case "number", "decimal", "currency", "autonumber"
-                                ctrl = $"<input type='number' class='form-control' name='field_{f.FieldId}' {req} step='any'>"
-                            Case "dropdown", "status"
-                                ctrl = $"<select class='form-select' name='field_{f.FieldId}'><option value=''>-- Select --</option></select>"
+                                ctrl = $"<input type='number' class='form-control' id='{fieldId}' name='{fieldId}' {req} step='any'>"
+                            Case "dropdown", "status", "multiselect"
+                                ctrl = $"<select class='form-select' id='{fieldId}' name='{fieldId}' data-config='{System.Web.HttpUtility.HtmlAttributeEncode(f.DropdownConfig)}'><option value=''>-- Select --</option></select>"
+                            Case "lookup"
+                                ctrl = $"<select class='form-select' id='{fieldId}' name='{fieldId}' data-lookup='{System.Web.HttpUtility.HtmlAttributeEncode(f.LookupConfig)}'><option value=''>-- Select --</option></select>"
                             Case Else
-                                ctrl = $"<input type='text' class='form-control' name='field_{f.FieldId}' {req} placeholder='{f.DisplayName}'>"
+                                ctrl = $"<input type='text' class='form-control' id='{fieldId}' name='{fieldId}' {req} placeholder='{f.DisplayName}'>"
                         End Select
-                        @<div class="col-md-6 mb-3">
+                        @<div class="col-md-6 mb-3 field-wrapper" data-field-id="@f.FieldId" data-internal-name="@f.InternalName">
                             <label class="form-label fw-bold">@f.DisplayName @Html.Raw(reqStar)</label>
                             @Html.Raw(ctrl)
                         </div>
@@ -45,3 +48,32 @@ End Code
         </div>
     End Using
 </div>
+
+@section scripts
+<script>
+(function () {
+    // Populate dropdown options from JSON config
+    document.querySelectorAll('select[data-config]').forEach(function (sel) {
+        try {
+            var cfg = JSON.parse(sel.getAttribute('data-config') || '{}');
+            if (cfg.options && Array.isArray(cfg.options)) {
+                cfg.options.forEach(function (opt) {
+                    var o = document.createElement('option');
+                    o.value = opt;
+                    o.text = opt;
+                    sel.add(o);
+                });
+            }
+        } catch (e) { console.warn('Dropdown config parse error', e); }
+    });
+
+    // Conditional field rules (example: show field B if field A = "Yes")
+    // This is a placeholder for dynamic rule evaluation from ValidationRule or custom JSON
+    // Future: read rules from field metadata and eval at runtime
+    document.getElementById('formFields').addEventListener('change', function (e) {
+        // Example rule: if any field changes, you can show/hide others
+        // For now, this is a hook for custom implementations
+    });
+})();
+</script>
+End Section

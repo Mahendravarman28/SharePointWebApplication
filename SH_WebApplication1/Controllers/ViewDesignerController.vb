@@ -3,6 +3,8 @@ Imports SH_WebApplication1.Data
 Imports SH_WebApplication1.Models.Metadata
 Imports SH_WebApplication1.Services
 Imports Newtonsoft.Json
+' Uncomment after installing ClosedXML via NuGet Package Manager Console
+' Imports ClosedXML.Excel
 
 Namespace Controllers
 
@@ -98,6 +100,56 @@ Namespace Controllers
             ViewBag.Items = _itemService.GetItems(listId)
             ViewBag.TotalCount = _itemService.CountItems(listId)
             Return View("Render")
+        End Function
+
+        ' GET: /ViewDesigner/ExportExcel?listId=5
+        Public Function ExportExcel(listId As Integer) As ActionResult
+            Try
+                ' Uncomment after installing ClosedXML NuGet package
+                ' Dim list = _listService.GetListById(listId)
+                ' If list Is Nothing Then Return HttpNotFound()
+                ' Dim fields = _listService.GetFields(listId).Where(Function(f) f.IsVisibleInList).ToList()
+                ' Dim items = _itemService.GetItems(listId, 0, 10000)
+                ' Using wb As New XLWorkbook()
+                '     Dim ws = wb.Worksheets.Add(list.ListName)
+                '     ' Header row
+                '     ws.Cell(1, 1).Value = "Item No"
+                '     Dim col As Integer = 2
+                '     For Each f In fields
+                '         ws.Cell(1, col).Value = f.DisplayName
+                '         col += 1
+                '     Next
+                '     ws.Cell(1, col).Value = "Status"
+                '     ws.Cell(1, col + 1).Value = "Created Date"
+                '     ' Data rows
+                '     Dim row As Integer = 2
+                '     For Each item In items
+                '         ws.Cell(row, 1).Value = item.ItemNo
+                '         col = 2
+                '         For Each f In fields
+                '             Dim val = item.Values?.FirstOrDefault(Function(v) v.FieldId = f.FieldId)
+                '             ws.Cell(row, col).Value = If(val IsNot Nothing, val.FieldValueText, "")
+                '             col += 1
+                '         Next
+                '         ws.Cell(row, col).Value = item.CurrentStatus
+                '         ws.Cell(row, col + 1).Value = item.CreatedDate.ToString("yyyy-MM-dd")
+                '         row += 1
+                '     Next
+                '     ' Format header
+                '     ws.Range(1, 1, 1, col + 1).Style.Font.Bold = True
+                '     ws.Range(1, 1, 1, col + 1).Style.Fill.BackgroundColor = XLColor.LightGray
+                '     ws.Columns().AdjustToContents()
+                '     ' Save to stream
+                '     Using stream As New IO.MemoryStream()
+                '         wb.SaveAs(stream)
+                '         Dim fileName = $"{list.ListName}_Export_{DateTime.Now:yyyyMMdd_HHmmss}.xlsx"
+                '         Return File(stream.ToArray(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", fileName)
+                '     End Using
+                ' End Using
+                Return Content("Excel export requires ClosedXML NuGet package. Install via: Install-Package ClosedXML")
+            Catch ex As Exception
+                Return Content($"Export error: {ex.Message}")
+            End Try
         End Function
 
         Private Function GetDefaultViewConfig(listId As Integer) As String

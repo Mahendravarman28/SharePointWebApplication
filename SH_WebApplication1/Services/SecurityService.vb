@@ -91,6 +91,37 @@ Namespace Services
             Return _db.AppRolePermissions.Any(Function(rp) userRoleIds.Contains(rp.RoleId) AndAlso rp.PermissionId = permId)
         End Function
 
+
+        ''' <summary>Get fields visible and editable to a user based on field-level permissions</summary>
+        Public Function GetVisibleFields(listId As Integer, userId As String) As List(Of AppListField) Implements ISecurityService.GetVisibleFields
+            ' Get user role IDs
+            Dim userRoleIds = _db.AppUserRoles _
+                                 .Where(Function(ur) ur.UserId = userId) _
+                                 .Select(Function(ur) ur.RoleId).ToList()
+            ' If user is admin or no roles, return all fields
+            If Not userRoleIds.Any() Then
+                Return _db.AppListFields.Where(Function(f) f.ListId = listId).OrderBy(Function(f) f.DisplayOrder).ToList()
+            End If
+            ' Get field permissions for user's roles
+            Dim fieldPerms = _db.AppFieldPermissions _
+                                .Where(Function(fp) userRoleIds.Contains(fp.RoleId)) _
+                                .GroupBy(Function(fp) fp.FieldId) _
+                                .Select(Function(grp) New With {
+                                    .FieldId = grp.Key,
+                                    .CanView = grp.Any(Function(p) p.CanView),
+                                    .CanEdit = grp.Any(Function(p) p.CanEdit)
+                                }).ToList()
+            ' Load all fields for this list
+            Dim fields = _db.AppListFields _
+                            .Where(Function(f) f.ListId = listId) _
+                            .OrderBy(Function(f) f.DisplayOrder).ToList()
+            ' If no field-level permissions exist, return all fields
+            If Not fieldPerms.Any() Then Return fields
+            ' Filter by CanView
+            Dim visibleFieldIds = fieldPerms.Where(Function(fp) fp.CanView).Select(Function(fp) fp.FieldId).ToList()
+            Return fields.Where(Function(f) visibleFieldIds.Contains(f.FieldId)).ToList()
+        End Function
+
     End Class
 
 End Namespace

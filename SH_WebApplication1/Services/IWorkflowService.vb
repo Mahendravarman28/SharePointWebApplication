@@ -18,6 +18,8 @@ Namespace Services
         Function SaveTransition(transition As AppWorkflowTransition) As AppWorkflowTransition
         Function DeleteTransition(transitionId As Integer) As Boolean
         ' Runtime execution
+        Function InitiateWorkflow(itemId As Integer, listId As Integer, userId As String) As Boolean
+        Function GetCurrentState(itemId As Integer) As AppWorkflowState
         Function ExecuteTransition(itemId As Integer, transitionId As Integer, userId As String, comments As String) As Boolean
         Function GetAvailableTransitions(itemId As Integer, userId As String) As List(Of AppWorkflowTransition)
         Function GetWorkflowHistory(itemId As Integer) As List(Of AppWorkflowTransaction)

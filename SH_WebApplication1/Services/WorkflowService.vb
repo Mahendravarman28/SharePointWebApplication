@@ -8,9 +8,11 @@ Namespace Services
         Implements IWorkflowService
 
         Private ReadOnly _db As AppDbContext
+        Private ReadOnly _securityService As ISecurityService
 
         Public Sub New(db As AppDbContext)
             _db = db
+            _securityService = New SecurityService(db)
         End Sub
 
         Public Function GetWorkflows(listId As Integer) As List(Of AppWorkflow) Implements IWorkflowService.GetWorkflows
@@ -149,16 +151,75 @@ Namespace Services
             item.ModifiedBy = userId
             item.ModifiedDate = DateTime.Now
             _db.SaveChanges()
+
+            ' Send email notification
+            Try
+                Dim emailService As New SmtpEmailService(_db)
+                emailService.SendWorkflowNotification(itemId, trans.FromState.StateName, trans.ToState.StateName, userId, comments)
+            Catch ex As Exception
+                ' Suppress email errors so workflow continues
+                System.Diagnostics.Debug.WriteLine($"Email notification error: {ex.Message}")
+            End Try
+
             Return True
+        End Function
+
+        Public Function InitiateWorkflow(itemId As Integer, listId As Integer, userId As String) As Boolean Implements IWorkflowService.InitiateWorkflow
+            Dim wf = GetPublishedWorkflow(listId)
+            If wf Is Nothing Then Return False
+            Dim startState = _db.AppWorkflowStates.FirstOrDefault(Function(s) s.WorkflowId = wf.WorkflowId AndAlso s.IsStart)
+            If startState Is Nothing Then Return False
+            Dim item = _db.AppItems.Find(itemId)
+            If item Is Nothing Then Return False
+            item.CurrentStateId = startState.StateId
+            item.CurrentStatus = startState.StateName
+            item.ModifiedBy = userId
+            item.ModifiedDate = DateTime.Now
+            ' Record the initiation as the first history entry
+            _db.AppWorkflowTransactions.Add(New AppWorkflowTransaction With {
+                .ItemId = itemId,
+                .WorkflowId = wf.WorkflowId,
+                .TransitionId = 0,
+                .FromState = "—",
+                .ToState = startState.StateCode,
+                .ActionBy = userId,
+                .ActionDate = DateTime.Now,
+                .Comments = "Workflow initiated"
+            })
+            _db.SaveChanges()
+            Return True
+        End Function
+
+        Public Function GetCurrentState(itemId As Integer) As AppWorkflowState Implements IWorkflowService.GetCurrentState
+            Dim item = _db.AppItems.Find(itemId)
+            If item Is Nothing OrElse Not item.CurrentStateId.HasValue Then Return Nothing
+            Return _db.AppWorkflowStates.Find(item.CurrentStateId.Value)
         End Function
 
         Public Function GetAvailableTransitions(itemId As Integer, userId As String) As List(Of AppWorkflowTransition) Implements IWorkflowService.GetAvailableTransitions
             Dim item = _db.AppItems.Find(itemId)
             If item Is Nothing OrElse Not item.CurrentStateId.HasValue Then Return New List(Of AppWorkflowTransition)()
-            Return _db.AppWorkflowTransitions _
-                      .Include(Function(t) t.ToState) _
-                      .Where(Function(t) t.FromStateId = item.CurrentStateId.Value) _
-                      .ToList()
+
+            ' Scope to the published workflow for this list
+            Dim wf = GetPublishedWorkflow(item.ListId)
+            If wf Is Nothing Then Return New List(Of AppWorkflowTransition)()
+
+            ' Get all transitions from current state
+            Dim allTransitions = _db.AppWorkflowTransitions _
+                                    .Include(Function(t) t.ToState) _
+                                    .Where(Function(t) t.WorkflowId = wf.WorkflowId AndAlso t.FromStateId = item.CurrentStateId.Value) _
+                                    .ToList()
+
+            ' Filter by user roles
+            Dim userRoles = _securityService.GetUserRoles(userId)
+            Dim userRoleNames = userRoles.Select(Function(r) r.RoleName).ToList()
+
+            ' Return transitions where:
+            ' - No role required (RoleRequired is null/empty), OR
+            ' - User has the required role
+            Return allTransitions.Where(Function(t) _
+                String.IsNullOrEmpty(t.RoleRequired) OrElse userRoleNames.Contains(t.RoleRequired)
+            ).ToList()
         End Function
 
         Public Function GetWorkflowHistory(itemId As Integer) As List(Of AppWorkflowTransaction) Implements IWorkflowService.GetWorkflowHistory

@@ -12,27 +12,32 @@ End Code
         @Html.AntiForgeryToken()
         @<div class="card shadow-sm">
             <div class="card-body">
-                <div class="row">
+                <div class="row" id="formFields">
                     @For Each f In fields
                         Dim capturedF = f
                         Dim val = item.Values?.FirstOrDefault(Function(v) v.FieldId = capturedF.FieldId)
                         Dim currentVal = If(val IsNot Nothing AndAlso Not String.IsNullOrEmpty(val.FieldValueText), val.FieldValueText, "")
                         Dim reqStar = If(f.IsRequired, " <span class='text-danger'>*</span>", "")
+                        Dim fieldId = $"field_{f.FieldId}"
                         Dim ctrl As String
                         Select Case f.DataType.ToLower()
                             Case "multiline"
-                                ctrl = $"<textarea class='form-control' name='field_{f.FieldId}' rows='3'>{currentVal}</textarea>"
+                                ctrl = $"<textarea class='form-control' id='{fieldId}' name='{fieldId}' rows='3'>{currentVal}</textarea>"
                             Case "yesno"
                                 Dim chk = If(currentVal = "true", "checked", "")
-                                ctrl = $"<div class='form-check'><input class='form-check-input' type='checkbox' name='field_{f.FieldId}' value='true' {chk}><label class='form-check-label'>Yes</label></div>"
+                                ctrl = $"<div class='form-check'><input class='form-check-input' id='{fieldId}' type='checkbox' name='{fieldId}' value='true' {chk}><label class='form-check-label'>Yes</label></div>"
                             Case "datetime"
-                                ctrl = $"<input type='datetime-local' class='form-control' name='field_{f.FieldId}' value='{currentVal}'>"
+                                ctrl = $"<input type='datetime-local' class='form-control' id='{fieldId}' name='{fieldId}' value='{currentVal}'>"
                             Case "number", "decimal", "currency"
-                                ctrl = $"<input type='number' class='form-control' name='field_{f.FieldId}' value='{currentVal}' step='any'>"
+                                ctrl = $"<input type='number' class='form-control' id='{fieldId}' name='{fieldId}' value='{currentVal}' step='any'>"
+                            Case "dropdown", "status", "multiselect"
+                                ctrl = $"<select class='form-select' id='{fieldId}' name='{fieldId}' data-config='{System.Web.HttpUtility.HtmlAttributeEncode(f.DropdownConfig)}' data-selected='{currentVal}'><option value=''>-- Select --</option></select>"
+                            Case "lookup"
+                                ctrl = $"<select class='form-select' id='{fieldId}' name='{fieldId}' data-lookup='{System.Web.HttpUtility.HtmlAttributeEncode(f.LookupConfig)}' data-selected='{currentVal}'><option value=''>-- Select --</option></select>"
                             Case Else
-                                ctrl = $"<input type='text' class='form-control' name='field_{f.FieldId}' value='{currentVal}'>"
+                                ctrl = $"<input type='text' class='form-control' id='{fieldId}' name='{fieldId}' value='{currentVal}'>"
                         End Select
-                        @<div class="col-md-6 mb-3">
+                        @<div class="col-md-6 mb-3 field-wrapper" data-field-id="@f.FieldId" data-internal-name="@f.InternalName">
                             <label class="form-label fw-bold">@f.DisplayName @Html.Raw(reqStar)</label>
                             @Html.Raw(ctrl)
                         </div>
@@ -46,3 +51,31 @@ End Code
         </div>
     End Using
 </div>
+
+@section scripts
+<script>
+(function () {
+    // Populate dropdown options from JSON config
+    document.querySelectorAll('select[data-config]').forEach(function (sel) {
+        try {
+            var cfg = JSON.parse(sel.getAttribute('data-config') || '{}');
+            var selected = sel.getAttribute('data-selected');
+            if (cfg.options && Array.isArray(cfg.options)) {
+                cfg.options.forEach(function (opt) {
+                    var o = document.createElement('option');
+                    o.value = opt;
+                    o.text = opt;
+                    if (opt === selected) o.selected = true;
+                    sel.add(o);
+                });
+            }
+        } catch (e) { console.warn('Dropdown config parse error', e); }
+    });
+
+    // Conditional field rules hook
+    document.getElementById('formFields').addEventListener('change', function (e) {
+        // Placeholder for custom conditional field rule evaluation
+    });
+})();
+</script>
+End Section

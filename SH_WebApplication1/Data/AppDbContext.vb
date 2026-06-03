@@ -8,6 +8,9 @@ Namespace Data
 
         Public Sub New()
             MyBase.New("name=DefaultConnection")
+
+            '    Database.SetInitializer(
+            '   New MigrateDatabaseToLatestVersion(Of AppDbContext, System.Data.Entity.Migrations.DbMigrationsConfiguration(Of AppDbContext))())
         End Sub
 
         ' Metadata tables
@@ -23,6 +26,7 @@ Namespace Data
         Public Property AppPermissions As DbSet(Of AppPermission)
         Public Property AppRolePermissions As DbSet(Of AppRolePermission)
         Public Property AppUserRoles As DbSet(Of AppUserRole)
+        Public Property AppFieldPermissions As DbSet(Of AppFieldPermission)
 
         ' Transaction tables
         Public Property AppItems As DbSet(Of AppItem)

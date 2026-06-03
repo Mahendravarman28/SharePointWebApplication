@@ -7,13 +7,41 @@
     Dim totalCount As Integer = ViewBag.TotalCount
 End Code
 
+@functions
+    Function StatusBadge(status As String) As String
+        If String.IsNullOrEmpty(status) Then Return "<span class='badge bg-secondary'> - </span>"
+        Dim colour As String = ""
+
+        Select Case status.ToLower()
+            Case "draft"
+                colour = "secondary"
+            Case "submitted"
+                colour = "info"
+            Case "under review", "reviewed"
+                colour = "warning text-dark"
+            Case "approved"
+                colour = "success"
+            Case "rejected"
+                colour = "danger"
+            Case "closed"
+                colour = "dark"
+            Case Else
+                colour = "primary"
+        End Select
+
+        Return $"<span class='badge bg-{colour}'>{status}</span>"
+    End Function
+End Functions
+
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2><i class="bi bi-table"></i> @list.ListName
+        <h2>
+            <i class="bi bi-table"></i> @list.ListName
             <span class="badge bg-info text-dark ms-2">@view.ViewType</span>
         </h2>
         <div class="d-flex gap-2">
             @Html.ActionLink("+ New Item", "Create", "Items", New With {.listId = list.ListId}, New With {.class = "btn btn-primary"})
+            @Html.ActionLink("Export Excel", "ExportExcel", "ViewDesigner", New With {.listId = list.ListId}, New With {.class = "btn btn-success"})
             @Html.ActionLink("Views", "Index", "ViewDesigner", New With {.listId = list.ListId}, New With {.class = "btn btn-outline-secondary"})
         </div>
     </div>
@@ -22,6 +50,13 @@ End Code
     <div class="mb-3">
         <input type="text" id="quickSearch" class="form-control" placeholder="Search items..." style="max-width:350px">
     </div>
+
+    @* TODO: Kanban and Calendar views require separate partial views due to VB Razor inline rendering limitations *@
+    @If view.ViewType = "Kanban" OrElse view.ViewType = "Calendar" Then
+        @<div class="alert alert-info">
+            <strong>@view.ViewType View</strong> rendering is planned. Currently showing Grid view.
+        </div>
+    End If
 
     <!-- Grid View -->
     <div class="card shadow-sm">
@@ -52,11 +87,12 @@ End Code
                                     Dim val = item.Values?.FirstOrDefault(Function(v) v.FieldId = capturedF.FieldId)
                                     @<td>@(If(val IsNot Nothing, val.FieldValueText, ""))</td>
                                 Next
-                                <td><span class="badge bg-secondary">@item.CurrentStatus</span></td>
+                                <td>@Html.Raw(StatusBadge(item.CurrentStatus))</td>
                                 <td class="small">@item.CreatedDate.ToString("dd-MMM-yyyy")</td>
                                 <td>
                                     @Html.ActionLink("View", "Display", "Items", New With {.id = item.ItemId}, New With {.class = "btn btn-sm btn-outline-info"})
                                     @Html.ActionLink("Edit", "Edit", "Items", New With {.id = item.ItemId}, New With {.class = "btn btn-sm btn-outline-secondary"})
+                                    @Html.ActionLink("⚡", "Execute", "WorkflowDesigner", New With {.itemId = item.ItemId}, New With {.class = "btn btn-sm btn-outline-warning", .title = "Workflow Actions"})
                                 </td>
                             </tr>
                         Next

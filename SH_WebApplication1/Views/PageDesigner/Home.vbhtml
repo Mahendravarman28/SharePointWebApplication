@@ -5,6 +5,7 @@
     Dim totalItems As Integer = ViewBag.TotalItems
     Dim recentItems As List(Of SH_WebApplication1.Models.Metadata.AppItem) = ViewBag.RecentItems
     Dim fields As List(Of SH_WebApplication1.Models.Metadata.AppListField) = ViewBag.Fields
+    Dim statusDist As List(Of statusGroupsModel) = ViewBag.StatusDistribution
 End Code
 
 <div class="container-fluid mt-4">
@@ -57,7 +58,7 @@ End Code
         </div>
     </div>
 
-    <!-- Recent Items + Quick Actions -->
+    <!-- Recent Items + Quick Actions + Chart -->
     <div class="row">
         <div class="col-md-8">
             <div class="card shadow-sm mb-4">
@@ -98,6 +99,14 @@ End Code
                     @Html.ActionLink("View All →", "Render", "ViewDesigner", New With {.listId = list.ListId}, New With {.class = "btn btn-sm btn-outline-primary"})
                 </div>
             </div>
+
+            <!-- Chart.js KPI Chart -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header fw-bold"><i class="bi bi-bar-chart-fill"></i> Status Distribution</div>
+                <div class="card-body">
+                    <canvas id="statusChart" style="max-height:300px"></canvas>
+                </div>
+            </div>
         </div>
 
         <!-- Quick Actions -->
@@ -116,3 +125,45 @@ End Code
         </div>
     </div>
 </div>
+
+@section scripts
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        @* Load status distribution data from server *@
+        var statusLabels = [@Html.Raw(String.Join(",", statusDist.Select(Function(s) $"'{s.Status}'")))];
+        var statusCounts = [@Html.Raw(String.Join(",", statusDist.Select(Function(s) s.Count)))];
+        var statusColors = ['#6c757d','#0dcaf0','#ffc107','#198754','#dc3545','#212529','#0d6efd'];
+
+        var ctx = document.getElementById('statusChart').getContext('2d');
+        var statusChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: statusLabels,
+                datasets: [{
+                    label: 'Item Count',
+                    data: statusCounts,
+                    backgroundColor: statusColors.slice(0, statusLabels.length),
+                    borderWidth: 0
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: { beginAtZero: true, ticks: { stepSize: 1 } }
+                }
+            }
+        });
+
+        @* Update KPI cards from status distribution *@
+        var draft = statusCounts[statusLabels.indexOf('Draft')] || 0;
+        var approved = statusCounts[statusLabels.indexOf('Approved')] || 0;
+        var pending = statusCounts[statusLabels.indexOf('Submitted')] || 0;
+        $('#kpiDraft').text(draft);
+        $('#kpiApproved').text(approved);
+        $('#kpiPending').text(pending);
+    </script>
+End Section
